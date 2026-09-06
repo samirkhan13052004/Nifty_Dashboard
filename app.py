@@ -1,97 +1,102 @@
 import streamlit as st
-import random
+import pyotp
+from SmartApi import SmartConnect
+import time
 
-# --- पेज सेटिंग (मोबाइल के लिए ऑप्टिमाइज्ड) ---
-st.set_page_config(page_title="Nifty50 Algo", page_icon="📈", layout="wide")
+# --- पेज कॉन्फ़िगरेशन ---
+st.set_page_config(page_title="Nifty50 Pro Setup", page_icon="⚡", layout="wide")
 
+# --- ब्यूटीफुल ग्रिड UI के लिए कस्टम CSS ---
 st.markdown("""
     <style>
-    .big-font { font-size:18px !important; font-weight: bold; }
-    .signal-buy { color: #00C851; font-size: 26px; font-weight: bold; text-align: center; padding: 10px; border-radius: 10px; background-color: rgba(0, 200, 81, 0.1); }
-    .signal-sell { color: #ff4444; font-size: 26px; font-weight: bold; text-align: center; padding: 10px; border-radius: 10px; background-color: rgba(255, 68, 68, 0.1); }
-    .signal-wait { color: #ffbb33; font-size: 26px; font-weight: bold; text-align: center; padding: 10px; border-radius: 10px; background-color: rgba(255, 187, 51, 0.1); }
+    .grid-card { background-color: #1E1E2E; border-radius: 12px; padding: 15px; margin-bottom: 15px; text-align: center; box-shadow: 0 4px 8px rgba(0,0,0,0.2); color: white; }
+    .grid-title { font-size: 14px; color: #A6ACCD; text-transform: uppercase; font-weight: bold; }
+    .grid-value { font-size: 24px; font-weight: bold; margin: 5px 0; }
+    .status-green { color: #00E676; font-size: 16px; font-weight: bold; }
+    .status-red { color: #FF1744; font-size: 16px; font-weight: bold; }
+    .status-neutral { color: #FFC400; font-size: 16px; font-weight: bold; }
+    .signal-box-buy { background: linear-gradient(135deg, #00C851, #007E33); padding: 20px; border-radius: 15px; text-align: center; color: white; margin-bottom: 20px;}
+    .signal-box-sell { background: linear-gradient(135deg, #ff4444, #CC0000); padding: 20px; border-radius: 15px; text-align: center; color: white; margin-bottom: 20px;}
+    .signal-box-wait { background: linear-gradient(135deg, #33b5e5, #0099CC); padding: 20px; border-radius: 15px; text-align: center; color: white; margin-bottom: 20px;}
     </style>
 """, unsafe_allow_html=True)
 
-st.title("🚀 Nifty50 Auto-Setup")
-st.markdown("12-Layer Institutional Filter Dashboard")
-st.divider()
+st.title("⚡ Nifty50 Pro Algorithmic Grid")
 
-# --- लाइव डेटा (जब तक API नहीं लगती, यह सिस्टम को टेस्ट करने के लिए है) ---
-def fetch_live_market_data():
-    return {
-        "Nifty_LTP": 21540.50,
-        "BankNifty_Trend": random.choice(["Bullish", "Bearish"]),
-        "India_VIX": round(random.uniform(10.5, 15.5), 2),
-        "PCR": round(random.uniform(0.6, 1.4), 2),
-        "Supertrend": random.choice(["Green", "Red"]),
-        "RSI": random.randint(35, 75),
-        "ADX": random.randint(15, 35),
-        "Price_vs_VWAP": random.choice(["Above", "Below"]),
-        "Price_vs_EMA200": "Above",
-        "Wick_Rejection": "No",
-        "Heavyweights_Green": random.randint(1, 5)
+# --- सेशन स्टेट इनिशियलाइज़ेशन ---
+if 'is_logged_in' not in st.session_state:
+    st.session_state['is_logged_in'] = False
+
+# --- साइडबार: Angel One लॉगिन फॉर्म ---
+with st.sidebar:
+    st.header("🔐 API Login")
+    st.markdown("Enter your Angel One credentials:")
+    
+    # UI इनपुट्स (पासवर्ड और कीज़ को सुरक्षित रखने के लिए type="password" लगा है)
+    client_id = st.text_input("Client ID")
+    password = st.text_input("Pin / Password", type="password")
+    api_key = st.text_input("API Key", type="password")
+    totp_secret = st.text_input("TOTP Secret", type="password")
+    
+    login_btn = st.button("Connect to Broker")
+
+    if login_btn:
+        if client_id and password and api_key and totp_secret:
+            try:
+                # एंजल वन लॉगिन प्रोसेस
+                smartApi = SmartConnect(api_key=api_key)
+                totp = pyotp.TOTP(totp_secret).now()
+                login_data = smartApi.generateSession(client_id, password, totp)
+                
+                if login_data['status']:
+                    st.session_state['is_logged_in'] = True
+                    st.success("✅ Login Successful!")
+                else:
+                    st.error(f"❌ Login Failed: {login_data['message']}")
+            except Exception as e:
+                st.error(f"⚠️ Error: {e}")
+        else:
+            st.warning("Please fill all the details.")
+
+# --- मुख्य स्क्रीन लॉजिक ---
+if not st.session_state['is_logged_in']:
+    st.info("👈 Please enter your API details in the sidebar to view the live dashboard.")
+else:
+    # --- डमी डेटा (इसे आप API डेटा फेच करने वाले फंक्शन से रिप्लेस करेंगे) ---
+    data = {
+        "ltp": 21545.80, "vix": 13.4, "pcr": 1.15, "rsi": 65, "adx": 28, 
+        "supertrend": "Green", "ema_trend": "Uptrend", "vwap_status": "Above", "heavyweights": 4
     }
 
-data = fetch_live_market_data()
+    # --- मास्टर सिग्नल (बड़ा अलर्ट बॉक्स) ---
+    if data['supertrend'] == "Green" and data['rsi'] > 60 and data['pcr'] > 1.0:
+        st.markdown(f'<div class="signal-box-buy"><h2>🟢 BUY NIFTY CE</h2><p>Entry: ₹{data["ltp"]} | SL: ₹{data["ltp"]-30} | TGT: ₹{data["ltp"]+60}</p></div>', unsafe_allow_html=True)
+    elif data['supertrend'] == "Red" and data['rsi'] < 40 and data['pcr'] < 0.8:
+        st.markdown(f'<div class="signal-box-sell"><h2>🔴 BUY NIFTY PE</h2><p>Entry: ₹{data["ltp"]} | SL: ₹{data["ltp"]+30} | TGT: ₹{data["ltp"]-60}</p></div>', unsafe_allow_html=True)
+    else:
+        st.markdown('<div class="signal-box-wait"><h2>🟡 SIDEWAYS MARKET</h2><p>Wait for High Probability Setup</p></div>', unsafe_allow_html=True)
 
-# --- टॉप पैनल (LTP, VIX, PCR) ---
-c1, c2, c3 = st.columns(3)
-with c1: st.metric("Nifty 50", f"₹{data['Nifty_LTP']}")
-with c2: st.metric("India VIX", data['India_VIX'])
-with c3: st.metric("PCR", data['PCR'])
+    # --- सुंदर ग्रिड लेआउट (3 कॉलम्स) ---
+    st.markdown("### 📊 Live Matrix")
+    col1, col2, col3 = st.columns(3)
 
-st.divider()
+    def grid_card(title, value, status, status_class):
+        return f'<div class="grid-card"><div class="grid-title">{title}</div><div class="grid-value">{value}</div><div class="{status_class}">{status}</div></div>'
 
-# --- मास्टर सिग्नल लॉजिक ---
-# यहाँ हम जानबूझकर डमी सिग्नल को ट्रिगर कर रहे हैं ताकि आप UI देख सकें 
-# (लाइव में यह इंडिकेटर्स की वैल्यू पर काम करेगा)
-if data['Supertrend'] == "Green" and data['RSI'] > 50 and data['PCR'] > 1.0:
-    st.markdown('<p class="signal-buy">🟢 BUY CALL (CE)</p>', unsafe_allow_html=True)
-    entry = data['Nifty_LTP']
-    sl = entry - 25
-    tgt = entry + 50
-elif data['Supertrend'] == "Red" and data['RSI'] < 50 and data['PCR'] < 1.0:
-    st.markdown('<p class="signal-sell">🔴 BUY PUT (PE)</p>', unsafe_allow_html=True)
-    entry = data['Nifty_LTP']
-    sl = entry + 25
-    tgt = entry - 50
-else:
-    st.markdown('<p class="signal-wait">🟡 NO TRADE (Sideways)</p>', unsafe_allow_html=True)
-    entry, sl, tgt = 0, 0, 0
+    with col1:
+        st.markdown(grid_card("Nifty 50 (LTP)", f"₹{data['ltp']}", "Active", "status-green"), unsafe_allow_html=True)
+        st.markdown(grid_card("Supertrend", data['supertrend'], "Bullish" if data['supertrend']=="Green" else "Bearish", "status-green" if data['supertrend']=="Green" else "status-red"), unsafe_allow_html=True)
+        st.markdown(grid_card("VWAP Filter", data['vwap_status'], "Price > VWAP", "status-green" if data['vwap_status']=="Above" else "status-red"), unsafe_allow_html=True)
 
-# --- एंट्री, स्टॉप-लॉस और टारगेट प्राइस ---
-if entry != 0:
-    st.subheader("🎯 Trade Levels")
-    tc1, tc2, tc3 = st.columns(3)
-    tc1.success(f"**ENTRY:** ₹{entry}")
-    tc2.error(f"**SL:** ₹{sl}")
-    tc3.info(f"**TARGET:** ₹{tgt}")
+    with col2:
+        st.markdown(grid_card("RSI Momentum", data['rsi'], "Strong" if data['rsi']>60 else "Weak", "status-green" if data['rsi']>60 else "status-neutral"), unsafe_allow_html=True)
+        st.markdown(grid_card("ADX Strength", data['adx'], "Trending Market" if data['adx']>25 else "Choppy", "status-green" if data['adx']>25 else "status-neutral"), unsafe_allow_html=True)
+        st.markdown(grid_card("EMA 200", data['ema_trend'], "Major Trend", "status-green" if data['ema_trend']=="Uptrend" else "status-red"), unsafe_allow_html=True)
 
-st.divider()
+    with col3:
+        st.markdown(grid_card("Put-Call Ratio (PCR)", data['pcr'], "Bullish" if data['pcr']>1.0 else "Bearish", "status-green" if data['pcr']>1.0 else "status-red"), unsafe_allow_html=True)
+        st.markdown(grid_card("India VIX", data['vix'], "Options Safe" if data['vix']>12 else "Premium Decay", "status-green" if data['vix']>12 else "status-neutral"), unsafe_allow_html=True)
+        st.markdown(grid_card("Heavyweights", f"{data['heavyweights']}/5", "In Sync", "status-green" if data['heavyweights']>=3 else "status-red"), unsafe_allow_html=True)
 
-# --- 12-Layer Filter Checklist (मोबाइल व्यू के लिए सेट किया गया) ---
-st.subheader("🛡️ Live Filter Status")
-
-def status(condition, good, bad):
-    return f"✅ {good}" if condition else f"❌ {bad}"
-
-with st.expander("📊 Technical Indicators", expanded=True):
-    st.write(status(data['Supertrend'] == "Green", "Supertrend Green", "Supertrend Red"))
-    st.write(status(data['Price_vs_VWAP'] == "Above", "Price > VWAP", "Price < VWAP"))
-    st.write(status(data['Price_vs_EMA200'] == "Above", "Uptrend (EMA200)", "Downtrend"))
-    st.write(status(data['RSI'] > 60 or data['RSI'] < 40, f"RSI Momentum ({data['RSI']})", f"RSI Choppy ({data['RSI']})"))
-
-with st.expander("🛡️ Smart Money & Options", expanded=True):
-    st.write(status(data['PCR'] > 1.0 or data['PCR'] < 0.8, f"PCR Directional ({data['PCR']})", f"PCR Neutral ({data['PCR']})"))
-    st.write(status(data['ADX'] > 25, f"ADX Strong ({data['ADX']})", f"ADX Weak/Sideways ({data['ADX']})"))
-    st.write(status(data['Wick_Rejection'] == "No", "No Wick Trap", "Candle Wick Trap!"))
-
-with st.expander("🌐 Macro & Sync Filters", expanded=True):
-    st.write(status(data['BankNifty_Trend'] == "Bullish", "BankNifty in Sync", "BankNifty Diverging"))
-    st.write(status(data['India_VIX'] > 12, f"VIX OK ({data['India_VIX']})", f"VIX Low ({data['India_VIX']})"))
-    st.write(status(data['Heavyweights_Green'] >= 3, f"{data['Heavyweights_Green']}/5 Heavyweights +ve", "Heavyweights Weak"))
-
-st.divider()
-if st.button("🔄 Refresh Data (Tap Here)", use_container_width=True):
-    st.rerun()
+    if st.button("🔄 Refresh API Data", use_container_width=True):
+        st.rerun()
