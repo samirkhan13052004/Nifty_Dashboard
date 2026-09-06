@@ -5,3 +5,4 @@ numpy
 smartapi-python
 pyotp
 logzero
+websocket-client
